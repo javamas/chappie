@@ -7,6 +7,7 @@ const commands = {
   'greet': ['hello','hi','greet'],
   'profile': ['profile'],
   'mq': ['mq'],
+  'araignee': ['araignee', 'あれにえ', 'アレニエ'],
   'manipulate': ['manipulate']
 }
 
@@ -33,6 +34,7 @@ controller.hears(commands.help,['direct_message','direct_mention','mention'], (b
     usage.push(`\`@${BOT_NAME} ${commands.greet}\`: あいさつ`)
     usage.push(`\`@${BOT_NAME} ${commands.profile}\`: ${BOT_NAME}を詳しく知る`)
     usage.push(`\`@${BOT_NAME} ${commands.mq}\`: メッセージキューを使う`)
+    usage.push(`\`@${BOT_NAME} ${commands.araignee}\`: araigneeする`)
     usage.push(`\`@${BOT_NAME} ${commands.manipulate}\`: ${BOT_NAME}を操る:skull:`)
     bot.reply(message, usage.join('\n'));
 });
@@ -65,7 +67,7 @@ controller.hears(commands.profile,['direct_message','direct_mention','mention'],
             {
                 pattern: 'house',
                 callback: function(response,convo) {
-                  convo.say('ぼくの住んでいるところの情報だよ:house:');
+                    convo.say('ぼくの住んでいるところの情報だよ:house:');
                     const env = JSON.stringify(process.env, null , '\t');
                     convo.say(`\`\`\`\n${env}\n\`\`\``);
                     convo.next();
@@ -168,7 +170,7 @@ controller.hears(commands.manipulate, ['direct_message','direct_mention','mentio
                         try {
                             convo.say(`\`\`\`\n${eval(code)}\n\`\`\``)
                         } catch (e) {
-                          convo.say(`\`\`\`\n${e}\n\`\`\``)
+                            convo.say(`\`\`\`\n${e}\n\`\`\``)
                         }
                         convo.next();
                     }
@@ -190,5 +192,44 @@ controller.hears(commands.manipulate, ['direct_message','direct_mention','mentio
             ]);
             convo.next();
         });
+    });
+});
+
+controller.hears(commands.araignee, ['direct_message','direct_mention','mention'], (bot,message) => {
+    bot.startConversation(message, function(err, convo) {
+        const host = process.env.MQ_HOST;
+        const user = process.env.MQ_USER;
+        const password = process.env.MQ_PASSWORD;
+        convo.ask('対象ページを教えて！', [
+            {
+                pattern: /https?:\/\/.+$/,
+                callback: function(response,convo) {
+                    amqp.connect(`amqp://${user}:${password}@${host}/${user}`, function(err, conn) {
+                        if (err) {
+                            convo.say('うまく送れなかった...');
+                            convo.say(`\`\`\`\n${err}\n\`\`\``);
+                        } else {
+                            conn.createChannel(function(err, ch) {
+                                var ex = 'pages';
+                                ch.assertExchange(ex, 'fanout', {durable: false});
+                                const url = response.text.substr(1, (response.text.length-2))
+                                ch.publish(ex, '', new Buffer(url));
+                                console.log(" [x] Sent %s", url);
+                                convo.say('URLを送ったよ！');
+                            });
+                            setTimeout(() => conn.close(), 500);
+                        }
+                        convo.next();
+                    });
+                }
+            },
+            {
+                default: true,
+                callback: function(response,convo) {
+                    convo.repeat();
+                    convo.next();
+                }
+            }
+        ]);
     });
 });
