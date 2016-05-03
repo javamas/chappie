@@ -72,7 +72,7 @@ controller.hears(commands.profile,['direct_message','direct_mention','mention'],
                 pattern: 'more',
                 callback: function(response,convo) {
                     convo.say('ここをみてね :eyes:');
-                    convo.say('https://github.com/disc99/chappie');
+                    convo.say('https://github.com/javamas/chappie');
                     convo.next();
                 }
             },
