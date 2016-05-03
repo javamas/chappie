@@ -133,8 +133,8 @@ controller.hears(commands.mq,['direct_message','direct_mention','mention'], (bot
                             convo.say('上手く接続できたよ！:sparkles:');
                             conn.close();
                         }
+                        convo.next();
                     });
-                    convo.next();
                 }
             },
             {
