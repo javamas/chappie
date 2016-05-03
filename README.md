@@ -5,7 +5,7 @@ Bot of development support
 ```Shell
 git clone https://github.com/javamas/chappie.git
 cd chappie
-npm inistall
+npm install
 ```
 
 ## Run
