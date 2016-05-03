@@ -1,10 +1,12 @@
-var Botkit = require('botkit');
+const Botkit = require('botkit');
+const amqp = require('amqplib/callback_api');
 
 const BOT_NAME = 'chappie';
 const commands = {
   'help': ['help'],
-  'greet': ['hello','hi'],
+  'greet': ['hello','hi','greet'],
   'profile': ['profile'],
+  'mq': ['mq'],
   'manipulate': ['manipulate']
 }
 
@@ -30,6 +32,7 @@ controller.hears(commands.help,['direct_message','direct_mention','mention'], (b
     usage.push(`\`@${BOT_NAME} ${commands.help}\`: できること`)
     usage.push(`\`@${BOT_NAME} ${commands.greet}\`: あいさつ`)
     usage.push(`\`@${BOT_NAME} ${commands.profile}\`: ${BOT_NAME}を詳しく知る`)
+    usage.push(`\`@${BOT_NAME} ${commands.mq}\`: メッセージキューを使う`)
     usage.push(`\`@${BOT_NAME} ${commands.manipulate}\`: ${BOT_NAME}を操る:skull:`)
     bot.reply(message, usage.join('\n'));
 });
@@ -73,6 +76,72 @@ controller.hears(commands.profile,['direct_message','direct_mention','mention'],
                 callback: function(response,convo) {
                     convo.say('ここをみてね :eyes:');
                     convo.say('https://github.com/javamas/chappie');
+                    convo.next();
+                }
+            },
+            {
+                default: true,
+                callback: function(response,convo) {
+                    convo.repeat();
+                    convo.next();
+                }
+            }
+        ]);
+    });
+});
+
+controller.hears(commands.mq,['direct_message','direct_mention','mention'], (bot,message) => {
+    bot.startConversation(message, function(err, convo) {
+        const host = process.env.MQ_HOST;
+        const user = process.env.MQ_USER;
+        const password = process.env.MQ_PASSWORD;
+        const questions = {
+          'q': '何をする？',
+          'commands': {
+              'help': 'メッセージキューについての説明',
+              'info': 'メッセージキューの情報',
+              'test': 'メッセージキューの接続テスト',
+              'login': '管理画面にログイン'
+          }
+        }
+        const q = [questions.q].concat(Object.keys(questions.commands).map(cmd => `\`${cmd}\`: ${questions.commands[cmd]}`)).join('\n');
+        convo.ask(q, [
+            {
+                pattern: 'help',
+                callback: function(response,convo) {
+                    convo.say('ここをみてね :eyes:');
+                    convo.say('https://gist.github.com/disc99/e46b0a76cd3285f9142776a15ce578bf');
+                    convo.next();
+                }
+            },
+            {
+                pattern: 'info',
+                callback: function(response,convo) {
+                    convo.say('メッセージキューの情報だよ :mailbox:');
+                    convo.say(`\`\`\`\nHost: ${host}\nUser: ${user}\nPassword: ${password}\n\`\`\``);
+                    convo.next();
+                }
+            },
+            {
+                pattern: 'test',
+                callback: function(response,convo) {
+                    amqp.connect(`amqp://${user}:${password}@${host}/${user}`, function(err, conn) {
+                        if (err) {
+                            convo.say('何か様子がおかしいみたいだ...');
+                            convo.say(`\`\`\`\n${err}\n\`\`\``);
+                        } else {
+                            convo.say('上手く接続できたよ！:sparkles:');
+                            conn.close();
+                        }
+                    });
+                    convo.next();
+                }
+            },
+            {
+                pattern: 'login',
+                callback: function(response,convo) {
+                    convo.say('ここからログインしてね:door:');
+                    convo.say(`https://${host}/`);
                     convo.next();
                 }
             },
