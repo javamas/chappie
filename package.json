@@ -11,6 +11,9 @@
   "license": "ISC",
   "dependencies": {
     "amqplib": "^0.4.1",
-    "botkit": "^0.1.1"
+    "botkit": "^0.1.1",
+    "cron": "^1.1.0",
+    "github-api": "^1.1.0",
+    "moment": "^2.13.0"
   }
 }

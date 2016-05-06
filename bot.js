@@ -1,5 +1,8 @@
 const Botkit = require('botkit');
 const amqp = require('amqplib/callback_api');
+const GitHub = require('github-api');
+const moment = require('moment');
+const CronJob = require('cron').CronJob;
 
 const BOT_NAME = 'chappie';
 const commands = {
@@ -20,7 +23,7 @@ const controller = Botkit.slackbot({
  debug: false
 });
 
-controller.spawn({
+const workerBot = controller.spawn({
   token: process.env.token
 }).startRTM((err) => {
   if (err) {
@@ -40,7 +43,9 @@ controller.hears(commands.help,['direct_message','direct_mention','mention'], (b
 });
 
 controller.hears(commands.greet,['direct_message','direct_mention','mention'], (bot,message) => {
-    bot.reply(message,"Bow-wow!");
+    const cries = ['Bow-wow!','Woof!','Howl!'];
+    const cry = cries[Math.floor(Math.random() * cries.length)];
+    bot.reply(message, cry);
 });
 
 controller.hears(commands.profile,['direct_message','direct_mention','mention'], (bot,message) => {
@@ -200,7 +205,7 @@ controller.hears(commands.araignee, ['direct_message','direct_mention','mention'
         const host = process.env.MQ_HOST;
         const user = process.env.MQ_USER;
         const password = process.env.MQ_PASSWORD;
-        convo.ask('対象ページを教えて！', [
+        convo.ask('対象ページを教えて！\nex) http://google.com', [
             {
                 pattern: /https?:\/\/.+$/,
                 callback: function(response,convo) {
@@ -210,7 +215,7 @@ controller.hears(commands.araignee, ['direct_message','direct_mention','mention'
                             convo.say(`\`\`\`\n${err}\n\`\`\``);
                         } else {
                             conn.createChannel(function(err, ch) {
-                                var ex = 'pages';
+                                const ex = 'pages';
                                 ch.assertExchange(ex, 'fanout', {durable: false});
                                 const url = response.text.substr(1, (response.text.length-2))
                                 ch.publish(ex, '', new Buffer(url));
@@ -231,5 +236,58 @@ controller.hears(commands.araignee, ['direct_message','direct_mention','mention'
                 }
             }
         ]);
+    });
+});
+
+new CronJob({
+    cronTime: '30 8 * * *',
+    onTick: function() {
+        workerBot.api.channels.list({}, (err, res) => {
+            if (err) {
+                // TODO
+            } else {
+                res.channels.filter(ch => ch.name === 'random').forEach(ch => {
+                    new GitHub({token: process.env.GITHUB_TOKEN})
+                        .getIssues('javamas', 'araignee')
+                        .listIssues({}, (error, result, request) => {
+                            const issueGroup = result
+                                .filter(i => i.milestone)
+                                .filter(i => i.milestone.state === 'open')
+                                .filter(i => moment().startOf('day').isSameOrBefore(i.milestone.due_on))
+                                .reduce((is, i) => {
+                                    is[i.milestone.number] = is[i.milestone.number] || [];
+                                    is[i.milestone.number].push(i);
+                                    return is;
+                                }, {});
+
+                            const res = Object.keys(issueGroup).reduce((ms, n) => {
+                                const is = issueGroup[n];
+                                const m = is[0].milestone;
+                                ms.push(`> *Milestone: ${m.title} (${moment(m.created_at).format('YYYY/MM/DD(ddd)')} 〜 ${moment(m.due_on).format('YYYY/MM/DD(ddd)')}*)`);
+                                is.forEach(i => {
+                                    ms.push(`#${i.number} [${i.title}] ${i.assignee ? ('@'+i.assignee.login) : 'No one'} ${i.html_url}`)
+                                });
+                                return ms;
+                            }, ['みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:']).join('\n');
+                            workerBot.say({
+                                text: res,
+                                channel: ch.id
+                            })
+                        });
+                });
+            }
+      });
+    },
+    start: true,
+    timeZone: 'Asia/Tokyo'
+}).start();
+
+
+// Add reactions
+controller.hears(['飲む', '飲み', '飯', 'ごはん'], ['ambient'], (bot, message) => {
+    bot.api.reactions.add({
+        timestamp: message.ts,
+        channel: message.channel,
+        name: 'meat_on_bone',
     });
 });
