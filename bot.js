@@ -43,7 +43,7 @@ controller.hears(commands.help,['direct_message','direct_mention','mention'], (b
 });
 
 controller.hears(commands.greet,['direct_message','direct_mention','mention'], (bot,message) => {
-    const cries = ['Bow-wow!','Woof!','Howl!'];
+    const cries = ['Bow-wow!','Woof!','Howl!','おいおい、あんまり夢中になるなよ :sparkles:','フッ、欲しがりさんだな :sparkling_heart:',':sleeping:'];
     const cry = cries[Math.floor(Math.random() * cries.length)];
     bot.reply(message, cry);
 });
