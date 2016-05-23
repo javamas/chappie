@@ -13,6 +13,19 @@ const commands = {
   'araignee': ['araignee', 'あれにえ', 'アレニエ'],
   'manipulate': ['manipulate']
 }
+const COLOR = {
+  "primary": "#428bca",
+  "success": "#5cb85c",
+  "info": "#5bc0de",
+  "warning": "#f0ad4e",
+  "danger": "#d9534f",
+  "get": num => {
+    if (num === 0) return COLOR.primary;
+    if (num > 0 && num <= 2) return COLOR.success;
+    if (num > 2 && num <= 4) return COLOR.warning;
+    if (num > 4) return COLOR.danger;
+  }
+}
 
 if (!process.env.token) {
   console.log('Error: Specify token in environment');
@@ -250,47 +263,62 @@ new CronJob({
                   new GitHub({token: process.env.GITHUB_TOKEN})
                       .getIssues('javamas', 'araignee')
                       .listIssues({}, (error, result, request) => {
-                          const issueGroup = result
+                          const milestoneGroup = result
                               .filter(i => i.milestone)
                               .filter(i => i.milestone.state === 'open')
                               .filter(i => moment().startOf('day').isSameOrBefore(i.milestone.due_on))
                               .reduce((is, i) => {
-                                  is[i.milestone.number] = is[i.milestone.number] || [];
-                                  is[i.milestone.number].push(i);
+                                  const msNumber = i.milestone.number;
+                                  const msAssignee = i.assignee ? '@'+i.assignee.login : 'No one';
+                                  is[msNumber] = is[msNumber] || [];
+                                  is[msNumber][msAssignee] = is[msNumber][msAssignee] || [];
+                                  is[msNumber][msAssignee].push(i);
                                   return is;
                               }, {});
 
-                          const res = Object.keys(issueGroup).reduce((ms, n) => {
-                              const is = issueGroup[n];
-                              const m = is[0].milestone;
-                              ms.push({
-                                  'color': '#7CD197',
-                                  'title': `Milestone: ${m.title}`,
-                                  'title_link': m.html_url,
-                                  'fields': [{
-                                      'title': 'Priority',
-                                      'value': `${moment(m.created_at).format('YYYY/MM/DD(ddd)')} 〜 ${moment(m.due_on).format('YYYY/MM/DD(ddd)')}`,
-                                      'short': true
-                                  }]
+                          const res = Object.keys(milestoneGroup).reduce((msAcc, msNumber) => {
+                              const milestone = milestoneGroup[msNumber][Object.keys(milestoneGroup[msNumber])[0]][0].milestone;
+                              msAcc.push({
+                                'color': COLOR.info,
+                                'title': `Milestone: ${milestone.title}`,
+                                'title_link': milestone.html_url,
+                                'fields': [{
+                                    'title': 'Priority',
+                                    'value': `${moment(milestone.created_at).format('YYYY/MM/DD(ddd)')} 〜 ${moment(milestone.due_on).format('YYYY/MM/DD(ddd)')}`,
+                                    'short': true
+                                }]
                               });
-                              is.forEach(i => {
-                                  ms.push({
-                                      'author_name': i.assignee ? '@'+i.assignee.login : 'No one',
-                                      'title': `#${i.number} ${i.title}`,
-                                      'title_link': i.html_url,
-                                  });
-                              });
-                              return ms;
+
+                              Object.keys(milestoneGroup[msNumber]).reduce((assigneeAcc, msAssignee) => {
+                                  const assignee = milestoneGroup[msNumber][msAssignee];
+                                  const assigneeMsg = {
+                                      "color": COLOR.get(assignee.length),
+                                      "title": `All ${assignee.length} issues`,
+                                      "title_link": msAssignee.startsWith("@") ? `https://github.com/javamas/araignee#boards?assignee=${msAssignee.substring(1)}` : "",
+                                      "author_name" : msAssignee,
+                                      "fields": assignee.map(i => {
+                                        return {
+                                          'value': `<${i.html_url}|#${i.number} ${i.title}>`
+                                        }
+                                      })
+                                  }
+
+                                  msAcc.push(assigneeMsg);
+                              }, []);
+
+                              return msAcc;
                           }, []);
+
                           workerBot.say({
                               text: 'みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:',
                               channel: ch.id,
                               attachments: res
                           });
+
                       });
                 });
             }
-      });
+        });
     },
     start: true,
     timeZone: 'Asia/Tokyo'
@@ -303,4 +331,8 @@ controller.hears(['飲む', '飲み', '飯', 'ごはん'], ['ambient'], (bot, me
         channel: message.channel,
         name: 'meat_on_bone',
     });
+});
+
+controller.hears(['ありがと'], ['ambient'], (bot, message) => {
+  bot.reply(message, "どういたしまして:notes:");
 });
