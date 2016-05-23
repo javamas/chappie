@@ -125,7 +125,7 @@ controller.hears(commands.mq,['direct_message','direct_mention','mention'], (bot
                 pattern: 'info',
                 callback: function(response,convo) {
                     convo.say('メッセージキューの情報だよ :mailbox:');
-                    convo.say(`\`\`\`\nHost: ${host}\nUser: ${user}\nPassword: ${password}\n\`\`\``);
+                    convo.say(`\`\`\`\nHost: ${host}\nUser: ${user}\nPassword: ${password}\nvhost: ${user}\n\`\`\``);
                     convo.next();
                 }
             },
@@ -260,7 +260,6 @@ new CronJob({
                                   return is;
                               }, {});
 
-                          const attachments = [];
                           const res = Object.keys(issueGroup).reduce((ms, n) => {
                               const is = issueGroup[n];
                               const m = is[0].milestone;
