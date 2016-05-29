@@ -267,6 +267,7 @@ new CronJob({
                               .filter(i => i.milestone)
                               .filter(i => i.milestone.state === 'open')
                               .filter(i => moment().startOf('day').isSameOrBefore(i.milestone.due_on))
+                              .sort((i1, i2) => i1.number - i2.number)
                               .reduce((is, i) => {
                                   const msNumber = i.milestone.number;
                                   const msAssignee = i.assignee ? '@'+i.assignee.login : 'No one';
