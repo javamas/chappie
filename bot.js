@@ -1,8 +1,7 @@
 const Botkit = require('botkit');
 const amqp = require('amqplib/callback_api');
-const GitHub = require('github-api');
-const moment = require('moment');
 const CronJob = require('cron').CronJob;
+const github = require("./lib/github.js")
 
 const BOT_NAME = 'chappie';
 const commands = {
@@ -12,19 +11,6 @@ const commands = {
   'mq': ['mq'],
   'araignee': ['araignee', 'あれにえ', 'アレニエ'],
   'manipulate': ['manipulate']
-}
-const COLOR = {
-  "primary": "#428bca",
-  "success": "#5cb85c",
-  "info": "#5bc0de",
-  "warning": "#f0ad4e",
-  "danger": "#d9534f",
-  "get": num => {
-    if (num === 0) return COLOR.primary;
-    if (num > 0 && num <= 2) return COLOR.success;
-    if (num > 2 && num <= 4) return COLOR.warning;
-    if (num > 4) return COLOR.danger;
-  }
 }
 
 if (!process.env.token) {
@@ -81,8 +67,7 @@ controller.hears(commands.profile,['direct_message','direct_mention','mention'],
                     convo.say('みんなのサポートをするからぼくにも話しかけてね :notes:');
                     convo.next();
                 }
-            },
-            {
+            }, {
                 pattern: 'house',
                 callback: function(response,convo) {
                     convo.say('ぼくの住んでいるところの情報だよ:house:');
@@ -90,16 +75,14 @@ controller.hears(commands.profile,['direct_message','direct_mention','mention'],
                     convo.say(`\`\`\`\n${env}\n\`\`\``);
                     convo.next();
                 }
-            },
-            {
+            }, {
                 pattern: 'more',
                 callback: function(response,convo) {
                     convo.say('ここをみてね :eyes:');
                     convo.say('https://github.com/javamas/chappie');
                     convo.next();
                 }
-            },
-            {
+            }, {
                 default: true,
                 callback: function(response,convo) {
                     convo.repeat();
@@ -133,16 +116,14 @@ controller.hears(commands.mq,['direct_message','direct_mention','mention'], (bot
                     convo.say('https://gist.github.com/disc99/e46b0a76cd3285f9142776a15ce578bf');
                     convo.next();
                 }
-            },
-            {
+            }, {
                 pattern: 'info',
                 callback: function(response,convo) {
                     convo.say('メッセージキューの情報だよ :mailbox:');
                     convo.say(`\`\`\`\nHost: ${host}\nUser: ${user}\nPassword: ${password}\nvhost: ${user}\n\`\`\``);
                     convo.next();
                 }
-            },
-            {
+            }, {
                 pattern: 'test',
                 callback: function(response,convo) {
                     amqp.connect(`amqp://${user}:${password}@${host}/${user}`, function(err, conn) {
@@ -156,16 +137,14 @@ controller.hears(commands.mq,['direct_message','direct_mention','mention'], (bot
                         convo.next();
                     });
                 }
-            },
-            {
+            }, {
                 pattern: 'login',
                 callback: function(response,convo) {
                     convo.say('ここからログインしてね:door:');
                     convo.say(`https://${host}/`);
                     convo.next();
                 }
-            },
-            {
+            }, {
                 default: true,
                 callback: function(response,convo) {
                     convo.repeat();
@@ -253,79 +232,31 @@ controller.hears(commands.araignee, ['direct_message','direct_mention','mention'
 });
 
 new CronJob({
-    cronTime: '30 8 * * *',
-    onTick: function() {
-        workerBot.api.channels.list({}, (err, res) => {
-            if (err) {
-                // TODO
-            } else {
-                res.channels.filter(ch => ch.name === 'random').forEach(ch => {
-                  new GitHub({token: process.env.GITHUB_TOKEN})
-                      .getIssues('javamas', 'araignee')
-                      .listIssues({}, (error, result, request) => {
-                          const milestoneGroup = result
-                              .filter(i => i.milestone)
-                              .filter(i => i.milestone.state === 'open')
-                              .filter(i => moment().startOf('day').isSameOrBefore(i.milestone.due_on))
-                              .sort((i1, i2) => i1.number - i2.number)
-                              .reduce((is, i) => {
-                                  const msNumber = i.milestone.number;
-                                  const msAssignee = i.assignee ? '@'+i.assignee.login : 'No one';
-                                  is[msNumber] = is[msNumber] || [];
-                                  is[msNumber][msAssignee] = is[msNumber][msAssignee] || [];
-                                  is[msNumber][msAssignee].push(i);
-                                  return is;
-                              }, {});
-
-                          const res = Object.keys(milestoneGroup).reduce((msAcc, msNumber) => {
-                              const milestone = milestoneGroup[msNumber][Object.keys(milestoneGroup[msNumber])[0]][0].milestone;
-                              msAcc.push({
-                                'color': COLOR.info,
-                                'title': `Milestone: ${milestone.title}`,
-                                'title_link': milestone.html_url,
-                                'fields': [{
-                                    'title': 'Priority',
-                                    'value': `${moment(milestone.created_at).format('YYYY/MM/DD(ddd)')} 〜 ${moment(milestone.due_on).format('YYYY/MM/DD(ddd)')}`,
-                                    'short': true
-                                }]
-                              });
-
-                              Object.keys(milestoneGroup[msNumber]).reduce((assigneeAcc, msAssignee) => {
-                                  const assignee = milestoneGroup[msNumber][msAssignee];
-                                  const assigneeMsg = {
-                                      "color": COLOR.get(assignee.length),
-                                      "title": `All ${assignee.length} issues`,
-                                      "title_link": msAssignee.startsWith("@") ? `https://github.com/javamas/araignee#boards?assignee=${msAssignee.substring(1)}` : "",
-                                      "author_name" : msAssignee,
-                                      "fields": assignee.map(i => {
-                                        return {
-                                          'value': `<${i.html_url}|#${i.number} ${i.title}>`
-                                        }
-                                      })
-                                  }
-
-                                  msAcc.push(assigneeMsg);
-                              }, []);
-
-                              return msAcc;
-                          }, []);
-
-                          workerBot.say({
-                              text: 'みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:',
-                              channel: ch.id,
-                              attachments: res
-                          });
-
-                      });
-                });
-            }
-        });
-    },
-    start: true,
-    timeZone: 'Asia/Tokyo'
+  cronTime: '30 8 * * *',
+  onTick: function() {
+    workerBot.api.channels.list({}, (err, res) => {
+      if (err) {
+        console.error(err);
+      }
+      res.channels
+          .filter(ch => ch.name === 'random')
+          .forEach(ch => {
+            github.assignees('javamas', 'araignee')
+                .then(data => {
+                  workerBot.say({
+                    text: 'みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:',
+                    channel: ch.id,
+                    attachments: data
+                  });
+                })
+                .catch(data => console.error(data));
+          });
+    });
+  },
+  start: true,
+  timeZone: 'Asia/Tokyo'
 }).start();
 
-// Add reactions
 controller.hears(['飲む', '飲み', '飯', 'ごはん'], ['ambient'], (bot, message) => {
     bot.api.reactions.add({
         timestamp: message.ts,
