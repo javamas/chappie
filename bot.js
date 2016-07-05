@@ -243,11 +243,13 @@ new CronJob({
           .forEach(ch => {
             github.assignees('javamas', 'araignee')
                 .then(data => {
-                  workerBot.say({
-                    text: 'みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:',
-                    channel: ch.id,
-                    attachments: data
-                  });
+                  if (data.length !== 0) {
+                    workerBot.say({
+                      text: 'みなさん！今進行中のMilestoneのIssueを報告するね:triangular_flag_on_post:',
+                      channel: ch.id,
+                      attachments: data
+                    });
+                  }
                 })
                 .catch(data => console.error(data));
           });
